@@ -1021,13 +1021,13 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `salesData_${monthKey}.json`;
+  a.download = `salesData.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   saveData(); /* localStorage에도 업로드 데이터 포함하여 저장 */
-  showToast(`salesData_${monthKey}.json 파일이 다운로드되었습니다. (${currentMonth}월 업로드 데이터 포함)`);
+  showToast(`salesData.json 파일이 다운로드되었습니다.`);
 }
 
 /* JSON 파일에서 데이터 가져오기 - 업로드 데이터 복원 포함 */
@@ -1140,9 +1140,12 @@ async function init() {
   /* 대시보드 전용 모드 */
   if (isDashboardOnly) {
     document.getElementById('headerTitle').textContent = `온라인 매출 대시보드 — ${currentMonth}월`;
-    document.querySelector('.side-nav').style.display = 'none';
-    document.querySelector('.nav-tabs').style.display = 'none';
-    document.querySelector('.main-content').style.padding = '22px 40px 70px';
+    const sideNav = document.querySelector('.side-nav');
+    const navTabs = document.querySelector('.nav-tabs');
+    const mainContent = document.querySelector('.main-content');
+    if (sideNav) sideNav.style.display = 'none';
+    if (navTabs) navTabs.style.display = 'none';
+    if (mainContent) mainContent.style.padding = '22px 40px 70px';
     switchTab('sales');
   } else {
     document.getElementById('headerTitle').textContent = `온라인 확정매출·집계 — ${currentMonth}월`;
