@@ -897,9 +897,9 @@ body {
       <select id="monthSelect" onchange="changeMonth(this.value)"></select>
     </div>
     <span class="date" id="headerDate"></span>
-    <button class="btn-data-sm" onclick="exportData()" title="데이터를 JSON 파일로 저장"><span class="material-symbols-outlined">save</span>저장</button>
-    <label class="btn-data-sm" title="JSON 파일에서 데이터 불러오기"><span class="material-symbols-outlined">folder_open</span>불러오기<input type="file" accept=".json" onchange="importData(event)" style="display:none;"></label>
-    <button class="btn-data-sm" onclick="openKeywordModal()" title="그로홈 제품 키워드 관리"><span class="material-symbols-outlined">label</span>관리</button>
+    <button class="btn-data-sm admin-btn" onclick="exportData()" title="데이터를 JSON 파일로 저장"><span class="material-symbols-outlined">save</span>저장</button>
+    <label class="btn-data-sm admin-btn" title="JSON 파일에서 데이터 불러오기"><span class="material-symbols-outlined">folder_open</span>불러오기<input type="file" accept=".json" onchange="importData(event)" style="display:none;"></label>
+    <button class="btn-data-sm admin-btn" onclick="openKeywordModal()" title="그로홈 제품 키워드 관리"><span class="material-symbols-outlined">label</span>관리</button>
     <span class="badge">넷폼알앤디</span>
   </div>
 </div>
@@ -1139,13 +1139,15 @@ async function init() {
 
   /* 대시보드 전용 모드 */
   if (isDashboardOnly) {
-    document.getElementById('headerTitle').textContent = `온라인 매출 대시보드 — ${currentMonth}월`;
+    document.getElementById('headerTitle').textContent = `온라인 확정매출 대시보드 — ${currentMonth}월`;
     const sideNav = document.querySelector('.side-nav');
     const navTabs = document.querySelector('.nav-tabs');
     const mainContent = document.querySelector('.main-content');
     if (sideNav) sideNav.style.display = 'none';
     if (navTabs) navTabs.style.display = 'none';
     if (mainContent) mainContent.style.padding = '22px 40px 70px';
+    /* 저장/불러오기/관리 버튼 숨기기 */
+    document.querySelectorAll('.admin-btn').forEach(el => el.style.display = 'none');
     switchTab('sales');
   } else {
     document.getElementById('headerTitle').textContent = `온라인 확정매출·집계 — ${currentMonth}월`;
