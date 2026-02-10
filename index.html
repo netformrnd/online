@@ -964,7 +964,7 @@ const SHOPS = [
   {id:'pour_offline', name:'계좌입금 매출', group:'both', url:'', userId:'', userPw:'', note:'더존 자료 기반 금액 산출', path:'', dataPaths:[{label:'계좌입금내역', path:''}]},
   {id:'both_smart_pour', name:'스마트스토어_포어', group:'both', url:'https://sell.smartstore.naver.com/#/home/dashboard', userId:'netform', userPw:_d('enB6ZzEzNTQ2QA=='), path:'정산관리 > 부가세신고', dataPaths:[{label:'매출내역', path:'정산관리 > 정산내역 > 건별정산내역 > 세금신고기준일'},{label:'구매확정내역', path:'정산관리 > 정산내역 > 건별정산내역 > 구매확정기준일'}]},
   {id:'both_smart_gro', name:'스마트스토어_그로홈', group:'both', url:'https://sell.smartstore.naver.com/#/home/dashboard', userId:'netform', userPw:_d('enB6ZzEzNTQ2QA=='), path:'정산관리 > 부가세신고', dataPaths:[{label:'매출내역', path:'정산관리 > 정산내역 > 건별정산내역 > 세금신고기준일'},{label:'구매확정내역', path:'정산관리 > 정산내역 > 건별정산내역 > 구매확정기준일'}]},
-  {id:'pour_domegook', name:'도매꾹', group:'both', url:'https://domeggook.com/sc/calculate/sellerView', userId:'pourstore0', userPw:_d('enB6ZzEzNTQ2QA=='), path:'구매확정 > 구매확정기준일 셋팅 후 > 엑셀다운로드 > 엑셀다운로드관리', dataPaths:[{label:'구매확정내역', path:'구매확정 > 엑셀다운로드 > 엑셀다운로드관리'}]},
+  {id:'pour_domegook', name:'도매꾹', group:'both', url:'https://domeggook.com/sc/calculate/sellerView', userId:'pourstore0', userPw:_d('enB6ZzEzNTQ2QA=='), path:'구매확정 > 구매확정기준일 셋팅 후 > 엑셀다운로드 > 엑셀다운로드관리', dataPaths:[{label:'매출확정', path:'매출확정 > 엑셀다운로드'},{label:'구매확정', path:'구매확정 > 엑셀다운로드'}]},
   {id:'pour_coupang', name:'쿠팡', group:'both', url:'https://wing.coupang.com/', userId:'pourstore', userPw:_d('enB6ZzEzNTQ2QEBA'), paths:[{label:'중개(위탁)', path:'정산 > 부가세신고내역'},{label:'로켓그로스', path:'정산 > 로켓그로스 현황'}], dataPaths:[{label:'중개(위탁)', path:'정산 > 부가세신고내역'},{label:'로켓그로스', path:'정산 > 로켓그로스 현황'}]},
   {id:'both_naver_pour', name:'자사몰_네이버페이_포어', group:'both', url:'https://admin.pay.naver.com/front/e/v1/settle_pay/page/settlemgt/taxinvoice', userId:'netform', userPw:_d('enB6ZzEzNTQ2QA=='), path:'정산관리 > 부가세신고', dataPaths:[{label:'매출내역', path:'정산관리 > 정산내역 > 건별정산내역 > 세금신고기준일'},{label:'구매확정내역', path:'정산관리 > 정산내역 > 건별정산내역 > 구매확정기준일'}]},
   {id:'both_naver_gro', name:'자사몰_네이버페이_그로홈', group:'both', url:'https://admin.pay.naver.com/front/e/v1/settle_pay/page/settlemgt/taxinvoice', userId:'netform', userPw:_d('enB6ZzEzNTQ2QA=='), path:'정산관리 > 부가세신고', dataPaths:[{label:'매출내역', path:'정산관리 > 정산내역 > 건별정산내역 > 세금신고기준일'},{label:'구매확정내역', path:'정산관리 > 정산내역 > 건별정산내역 > 구매확정기준일'}]},
@@ -1067,13 +1067,10 @@ function importData(event) {
 }
 
 function getShopSetting(shopId, field) {
-  /* dataPaths는 항상 SHOPS 배열에서 가져옴 (localStorage 무시) */
   const shop = SHOPS.find(s => s.id === shopId);
-  if (field === 'dataPaths') {
-    return shop ? shop.dataPaths : null;
-  }
-  /* 그 외 필드는 localStorage에서 먼저 확인 */
+  /* localStorage에서 먼저 확인 (dataPaths 포함) */
   if (DATA.settings[shopId] && DATA.settings[shopId][field] !== undefined) return DATA.settings[shopId][field];
+  /* 없으면 SHOPS 배열에서 기본값 사용 */
   return shop ? (shop[field] || '') : '';
 }
 function setShopSetting(shopId, field, value) {
@@ -2032,16 +2029,17 @@ function getBrandSalesDataWithGroups(brand, fmt) {
     if (offlineSlotId) {
       const offLabel = '계좌입금 매출';
       let hasData = false;
-      const offMonths = new Array(12).fill(0);
-      let offTotal = 0;
+      const offMonthsRaw = new Array(12).fill(0);
+      let offTotalRaw = 0;
       for (let m = 1; m <= 12; m++) {
         const raw = (DATA.sales && DATA.sales[m] && DATA.sales[m][offlineSlotId]) ? Number(DATA.sales[m][offlineSlotId]) : 0;
         if (raw > 0) hasData = true;
-        const val = fmt(raw);
-        offMonths[m - 1] = val;
-        offTotal += val;
+        offMonthsRaw[m - 1] = raw;
+        offTotalRaw += raw;
       }
       if (hasData && !shopSalesMap[offLabel]) {
+        const offMonths = offMonthsRaw.map(v => fmt(v));
+        const offTotal = fmt(offTotalRaw);
         shopSalesMap[offLabel] = { monthVals: offMonths, total: offTotal, groupId: null };
       }
     }
@@ -2103,6 +2101,10 @@ function aggregateBrandSalesWithGroup(result, shopName, shopId, targetBrand, fmt
     if (group.shopIds.includes(shopId)) groupId = group.id;
   });
 
+  /* v+ 합계를 먼저 구하고 마지막에 fmt 적용 */
+  const monthValsRaw = new Array(12).fill(0);
+  let totalRaw = 0;
+
   result.rows.forEach(row => {
     const brand = String(row[brandIdx] || '').trim();
     if (brand !== brandMatch) return;
@@ -2117,13 +2119,19 @@ function aggregateBrandSalesWithGroup(result, shopName, shopId, targetBrand, fmt
       if (m) month = parseInt(m[2]);
     }
 
+    monthValsRaw[month - 1] += amt;
+    totalRaw += amt;
+  });
+
+  if (totalRaw > 0) {
     if (!shopSalesMap[shopName]) {
       shopSalesMap[shopName] = { monthVals: new Array(12).fill(0), total: 0, groupId };
     }
-    const val = fmt(amt);
-    shopSalesMap[shopName].monthVals[month - 1] += val;
-    shopSalesMap[shopName].total += val;
-  });
+    monthValsRaw.forEach((v, i) => {
+      shopSalesMap[shopName].monthVals[i] += fmt(v);
+    });
+    shopSalesMap[shopName].total += fmt(totalRaw);
+  }
 }
 
 /* 쿠팡: 브랜드별 보기에서 쇼핑몰 컬럼 기반으로 중개/로켓그로스 분리 집계 */
@@ -2137,6 +2145,10 @@ function aggregateCoupangBrandSales(result, targetBrand, fmt, shopSalesMap) {
 
   const brandMatch = targetBrand === 'grohome' ? '그로홈' :
                      targetBrand === 'pourstore' ? '포어스토어' : '모여라딜';
+
+  /* v+ 합계를 먼저 구하고 마지막에 fmt 적용 */
+  const coupangRaw = { monthVals: new Array(12).fill(0), total: 0 };
+  const rocketRaw = { monthVals: new Array(12).fill(0), total: 0 };
 
   result.rows.forEach(row => {
     const brand = String(row[brandIdx] || '').trim();
@@ -2155,15 +2167,26 @@ function aggregateCoupangBrandSales(result, targetBrand, fmt, shopSalesMap) {
     /* 쇼핑몰 컬럼으로 중개/로켓그로스 구분 */
     const shopCol = shopColIdx >= 0 ? String(row[shopColIdx] || '').trim() : '';
     const isRocket = shopCol.includes('로켓그로스');
-    const childName = isRocket ? '쿠팡_로켓그로스' : '쿠팡';
-
-    if (!shopSalesMap[childName]) {
-      shopSalesMap[childName] = { monthVals: new Array(12).fill(0), total: 0, groupId: 'brand_coupang_group' };
-    }
-    const val = fmt(amt);
-    shopSalesMap[childName].monthVals[month - 1] += val;
-    shopSalesMap[childName].total += val;
+    const target = isRocket ? rocketRaw : coupangRaw;
+    target.monthVals[month - 1] += amt;
+    target.total += amt;
   });
+
+  /* 합계에서 fmt 적용 */
+  if (coupangRaw.total > 0) {
+    if (!shopSalesMap['쿠팡']) {
+      shopSalesMap['쿠팡'] = { monthVals: new Array(12).fill(0), total: 0, groupId: 'brand_coupang_group' };
+    }
+    coupangRaw.monthVals.forEach((v, i) => { shopSalesMap['쿠팡'].monthVals[i] += fmt(v); });
+    shopSalesMap['쿠팡'].total += fmt(coupangRaw.total);
+  }
+  if (rocketRaw.total > 0) {
+    if (!shopSalesMap['쿠팡_로켓그로스']) {
+      shopSalesMap['쿠팡_로켓그로스'] = { monthVals: new Array(12).fill(0), total: 0, groupId: 'brand_coupang_group' };
+    }
+    rocketRaw.monthVals.forEach((v, i) => { shopSalesMap['쿠팡_로켓그로스'].monthVals[i] += fmt(v); });
+    shopSalesMap['쿠팡_로켓그로스'].total += fmt(rocketRaw.total);
+  }
 }
 
 /* 자사몰 확장/축소 토글 */
@@ -2293,6 +2316,7 @@ function downloadSalesOverviewExcel() {
 
   /* 쇼핑몰별 데이터 생성 */
   function buildShopData(isVatMinus) {
+    /* v+ 합계를 먼저 구하고 마지막에 ÷1.1 (반올림 오차 방지) */
     const fmt = v => isVatMinus ? Math.round(v / 1.1) : v;
     const rows = [];
     const grandTotals = new Array(12).fill(0);
@@ -2300,97 +2324,113 @@ function downloadSalesOverviewExcel() {
 
     const normalShops = SHOPS.filter(s => !jasangShopIds.has(s.id) && s.id !== 'pour_coupang' && s.id !== 'moyeora_cafe24' && s.id !== 'pour_offline');
     const shopData = normalShops.map(shop => {
-      const monthVals = [];
-      let total = 0;
+      const monthValsRaw = [];
+      let totalRaw = 0;
       for (let m = 1; m <= 12; m++) {
         const raw = (DATA.sales && DATA.sales[m] && DATA.sales[m][shop.id]) ? Number(DATA.sales[m][shop.id]) : 0;
-        const val = fmt(raw);
-        monthVals.push(val);
-        total += val;
+        monthValsRaw.push(raw);
+        totalRaw += raw;
       }
+      /* 합계에서 ÷1.1 */
+      const monthVals = monthValsRaw.map(v => fmt(v));
+      const total = fmt(totalRaw);
       return { shopId: shop.id, displayName: getShopDisplayName(shop), monthVals, total, isJasang: false };
     });
 
     const coupangGroupData = (function() {
-      const monthVals = new Array(12).fill(0);
-      let total = 0;
+      const monthValsRaw = new Array(12).fill(0);
+      let totalRaw = 0;
       const children = [];
       COUPANG_GROUP.children.forEach(child => {
-        const childMonths = [];
-        let childTotal = 0;
+        const childMonthsRaw = [];
+        let childTotalRaw = 0;
         for (let m = 1; m <= 12; m++) {
           const raw = (DATA.sales && DATA.sales[m] && DATA.sales[m][child.slotId]) ? Number(DATA.sales[m][child.slotId]) : 0;
-          const val = fmt(raw);
-          childMonths.push(val);
-          monthVals[m - 1] += val;
-          childTotal += val;
+          childMonthsRaw.push(raw);
+          monthValsRaw[m - 1] += raw;
+          childTotalRaw += raw;
         }
-        total += childTotal;
+        totalRaw += childTotalRaw;
+        /* 자식 항목도 합계에서 ÷1.1 */
+        const childMonths = childMonthsRaw.map(v => fmt(v));
+        const childTotal = fmt(childTotalRaw);
         children.push({ slotId: child.slotId, label: child.label, monthVals: childMonths, total: childTotal });
       });
+      /* 그룹 합계도 ÷1.1 */
+      const monthVals = monthValsRaw.map(v => fmt(v));
+      const total = fmt(totalRaw);
       return { groupId: COUPANG_GROUP.id, shopId: COUPANG_GROUP.id, displayName: COUPANG_GROUP.label, monthVals, total, isCoupangGroup: true, children };
     })();
 
     const moyeoraGroupData = (function() {
-      const monthVals = new Array(12).fill(0);
-      let total = 0;
+      const monthValsRaw = new Array(12).fill(0);
+      let totalRaw = 0;
       const children = [];
       MOYEORA_GROUP.children.forEach(child => {
-        const childMonths = [];
-        let childTotal = 0;
+        const childMonthsRaw = [];
+        let childTotalRaw = 0;
         for (let m = 1; m <= 12; m++) {
           let raw = (DATA.sales && DATA.sales[m] && DATA.sales[m][child.slotId]) ? Number(DATA.sales[m][child.slotId]) : 0;
           if (raw === 0 && child.slotId === 'moyeora_moyeora') {
             raw = (DATA.sales && DATA.sales[m] && DATA.sales[m]['moyeora_cafe24']) ? Number(DATA.sales[m]['moyeora_cafe24']) : 0;
           }
-          const val = fmt(raw);
-          childMonths.push(val);
-          monthVals[m - 1] += val;
-          childTotal += val;
+          childMonthsRaw.push(raw);
+          monthValsRaw[m - 1] += raw;
+          childTotalRaw += raw;
         }
-        total += childTotal;
+        totalRaw += childTotalRaw;
+        const childMonths = childMonthsRaw.map(v => fmt(v));
+        const childTotal = fmt(childTotalRaw);
         children.push({ slotId: child.slotId, label: child.label, monthVals: childMonths, total: childTotal });
       });
+      const monthVals = monthValsRaw.map(v => fmt(v));
+      const total = fmt(totalRaw);
       return { groupId: MOYEORA_GROUP.id, shopId: MOYEORA_GROUP.id, displayName: MOYEORA_GROUP.label, monthVals, total, isMoyeoraGroup: true, children };
     })();
 
     const offlineGroupData = (function() {
-      const monthVals = new Array(12).fill(0);
-      let total = 0;
+      const monthValsRaw = new Array(12).fill(0);
+      let totalRaw = 0;
       const children = [];
       OFFLINE_GROUP.children.forEach(child => {
-        const childMonths = [];
-        let childTotal = 0;
+        const childMonthsRaw = [];
+        let childTotalRaw = 0;
         for (let m = 1; m <= 12; m++) {
           const raw = (DATA.sales && DATA.sales[m] && DATA.sales[m][child.slotId]) ? Number(DATA.sales[m][child.slotId]) : 0;
-          const val = fmt(raw);
-          childMonths.push(val);
-          monthVals[m - 1] += val;
-          childTotal += val;
+          childMonthsRaw.push(raw);
+          monthValsRaw[m - 1] += raw;
+          childTotalRaw += raw;
         }
-        total += childTotal;
+        totalRaw += childTotalRaw;
+        const childMonths = childMonthsRaw.map(v => fmt(v));
+        const childTotal = fmt(childTotalRaw);
         children.push({ slotId: child.slotId, label: child.label, monthVals: childMonths, total: childTotal });
       });
+      const monthVals = monthValsRaw.map(v => fmt(v));
+      const total = fmt(totalRaw);
       return { groupId: OFFLINE_GROUP.id, shopId: OFFLINE_GROUP.id, displayName: OFFLINE_GROUP.label, monthVals, total, isOfflineGroup: true, children };
     })();
 
     const jasangData = Object.entries(JASANG_GROUPS).map(([groupId, group]) => {
-      const monthVals = new Array(12).fill(0);
-      let total = 0;
+      const monthValsRaw = new Array(12).fill(0);
+      let totalRaw = 0;
       const children = [];
       group.shopIds.forEach(shopId => {
-        const childMonths = [];
-        let childTotal = 0;
+        const childMonthsRaw = [];
+        let childTotalRaw = 0;
         for (let m = 1; m <= 12; m++) {
           const raw = (DATA.sales && DATA.sales[m] && DATA.sales[m][shopId]) ? Number(DATA.sales[m][shopId]) : 0;
-          const val = fmt(raw);
-          childMonths.push(val);
-          monthVals[m - 1] += val;
-          childTotal += val;
+          childMonthsRaw.push(raw);
+          monthValsRaw[m - 1] += raw;
+          childTotalRaw += raw;
         }
-        total += childTotal;
+        totalRaw += childTotalRaw;
+        const childMonths = childMonthsRaw.map(v => fmt(v));
+        const childTotal = fmt(childTotalRaw);
         children.push({ shopId, label: JASANG_LABELS[shopId], monthVals: childMonths, total: childTotal });
       });
+      const monthVals = monthValsRaw.map(v => fmt(v));
+      const total = fmt(totalRaw);
       return { groupId, shopId: groupId, displayName: group.label, monthVals, total, isJasang: true, children };
     });
 
@@ -2429,8 +2469,8 @@ function downloadSalesOverviewExcel() {
     /* 모여라딜: MOYEORA_GROUP 기반 그로홈/중개 데이터 직접 생성 */
     if (brand === 'moyeora') {
       MOYEORA_GROUP.children.forEach(child => {
-        const mv = new Array(12).fill(0);
-        let t = 0;
+        const mvRaw = new Array(12).fill(0);
+        let tRaw = 0;
         for (let m = 1; m <= 12; m++) {
           const sales = DATA.sales && DATA.sales[m];
           let raw = sales ? (Number(sales[child.slotId]) || 0) : 0;
@@ -2444,9 +2484,11 @@ function downloadSalesOverviewExcel() {
             const gp = Number(sales['pour_offline_moyeora_grohome']) || 0;
             if (lt > 0 && gp === 0) raw = lt;
           }
-          const val = fmt(raw);
-          mv[m - 1] = val; t += val;
+          mvRaw[m - 1] = raw;
+          tRaw += raw;
         }
+        const mv = mvRaw.map(v => fmt(v));
+        const t = fmt(tRaw);
         rows.push([child.label, ...mv, t]);
         mv.forEach((v, i) => grandTotals[i] += v);
         grandTotal += t;
@@ -3837,7 +3879,7 @@ function renderSteps(steps) {
 }
 
 /* ───── 데이터 취합 기능 ───── */
-const MAPPING_VERSION = 8;
+const MAPPING_VERSION = 10;
 
 /* 제품코드→제품명 공식 매핑 (재고관리 파일 기준) */
 const PRODUCT_CODE_NAME_MAP = {
@@ -4399,7 +4441,7 @@ const SHOP_MAPPINGS = {
       addToSettle: '판매자 최종정산금'
     },
     columns: [
-      {name:'매출월',       source:'구매결정일', transform:'monthStartText'},
+      {name:'매출월',       source:null, transform:'selectedMonth'},
       {name:'쇼핑몰',       source:null, fixed:'지마켓'},
       {name:'브랜드',         source:null, transform:'classifyFromProduct'},
       {name:'제품코드',     source:null, transform:'productCode'},
@@ -4411,7 +4453,7 @@ const SHOP_MAPPINGS = {
       {name:'판매상품명',    source:'상품명'},
       {name:'옵션명',       source:'옵션상품'},
       {name:'주문번호',     source:'주문번호'},
-      {name:'주문일',       source:'구매결정일'},
+      {name:'주문일',       source:'체결일'},
       {name:'정산완료일',    source:'정산완료일'}
     ],
     appendRaw: false,
@@ -4427,18 +4469,18 @@ const SHOP_MAPPINGS = {
       {name:'브랜드',         source:null, transform:'classifyFromProduct'},
       {name:'제품코드',     source:null, transform:'productCode'},
       {name:'제품명',       source:null, transform:'keywordMatch'},
-      {name:'수량',         source:'주문수량'},
+      {name:'수량',         source:'주문수'},
       {name:'매출금액(v+)', source:'적립예정금액', transform:'addShipping', shippingSource:'판매수수료'},
       {name:'매출금액(v-)', source:'적립예정금액', transform:'addShippingVatMinus', shippingSource:'판매수수료'},
       {name:'정산예정금액',  source:'적립예정금액'},
       {name:'판매상품명',    source:'상품명'},
-      {name:'옵션명',       source:'상품주문옵션'},
+      {name:'옵션명',       source:null, joinSource:{slotIndex:1, header:'상품주문옵션'}},
       {name:'주문번호',     source:'주문번호'},
-      {name:'주문일',       source:'구매확정일'},
-      {name:'정산완료일',    source:'적립일시'}
+      {name:'주문일',       source:'주문일시'},
+      {name:'정산완료일',    source:'정산일시'}
     ],
     appendRaw: false,
-    joins: []
+    joins: [{slotIndex:1, keySource:'주문번호', targetKey:'주문번호', keyTransform:'removeORPrefix'}]
   },
   pour_coupang: {
     _v: MAPPING_VERSION,
@@ -4705,6 +4747,11 @@ function parseUploadedFile(file, shopId, slotIdx, subTabId, password) {
       }
       const key = getUploadKey(shopId, slotIdx, subTabId || undefined);
       UPLOAD_FILES[key] = {name: file.name, headers: headers, rows: rows, rowCount: rows.length};
+      /* 업로드 즉시 localStorage에 저장 */
+      const monthKey = currentYear + '-' + String(currentMonth).padStart(2,'0');
+      if (!DATA.uploadFiles) DATA.uploadFiles = {};
+      DATA.uploadFiles[monthKey] = JSON.parse(JSON.stringify(UPLOAD_FILES));
+      saveData();
       refreshShopContent(shopId);
       showToast(file.name + ' 업로드 완료 (' + rows.length + '행)');
       updateMappingDropdowns(shopId, slotIdx);
@@ -4862,20 +4909,33 @@ function transformValue(value, transformType, context, col) {
       return '포어스토어';
     }
     case 'classifyFromProductDirect': {
-      /* 상품명 value에서 직접 분류 추출 (로켓그로스용) */
-      const text = String(value || '').replace(/"/g, '');
+      /* 상품명 + 옵션명 value에서 직접 분류 추출 (로켓그로스용) */
+      let text = String(value || '').replace(/"/g, '');
+      /* 옵션명도 합쳐서 매칭 (context에서 가져옴) */
+      if (context && context._row && context._headers) {
+        const optIdx = context._headers.indexOf('옵션명');
+        if (optIdx >= 0) text += ' ' + String(context._row[optIdx] || '').replace(/"/g, '');
+      }
       const matchedName = matchProductKeyword(text);
       return classifyCategory(matchedName);
     }
     case 'productCodeDirect': {
-      /* 상품명 value에서 직접 제품코드 추출 (로켓그로스용) */
-      const text = String(value || '').replace(/"/g, '');
+      /* 상품명 + 옵션명 value에서 직접 제품코드 추출 (로켓그로스용) */
+      let text = String(value || '').replace(/"/g, '');
+      if (context && context._row && context._headers) {
+        const optIdx = context._headers.indexOf('옵션명');
+        if (optIdx >= 0) text += ' ' + String(context._row[optIdx] || '').replace(/"/g, '');
+      }
       const result = matchProductKeywordWithCode(text);
       return result.code || '';
     }
     case 'keywordMatchDirect': {
-      /* 상품명 value에서 직접 제품명 매칭 (로켓그로스용) */
-      const text = String(value || '').replace(/"/g, '');
+      /* 상품명 + 옵션명 value에서 직접 제품명 매칭 (로켓그로스용) */
+      let text = String(value || '').replace(/"/g, '');
+      if (context && context._row && context._headers) {
+        const optIdx = context._headers.indexOf('옵션명');
+        if (optIdx >= 0) text += ' ' + String(context._row[optIdx] || '').replace(/"/g, '');
+      }
       return matchProductKeyword(text);
     }
     case 'qtyByAmountSign': {
@@ -4997,15 +5057,21 @@ function executeSlotMerge(shopId, mainData, config, stId) {
   /* JOIN 데이터 준비 */
   const joinDataMap = {};
   if (config.joins) {
+    console.log(`[${shopId}] JOIN 설정:`, config.joins);
     config.joins.forEach((j, ji) => {
-      const jData = UPLOAD_FILES[getUploadKey(shopId, j.slotIndex, stId)];
+      const uploadKey = getUploadKey(shopId, j.slotIndex, stId);
+      const jData = UPLOAD_FILES[uploadKey];
+      console.log(`[${shopId}] JOIN 슬롯${j.slotIndex} 키: ${uploadKey}, 데이터 있음: ${!!jData}`);
       if (jData) {
+        console.log(`[${shopId}] JOIN 슬롯${j.slotIndex} 헤더:`, jData.headers);
         const keyIdx = jData.headers.indexOf(j.targetKey);
+        console.log(`[${shopId}] targetKey '${j.targetKey}' 인덱스: ${keyIdx}`);
         const map = {};
         jData.rows.forEach(row => {
           const key = String(row[keyIdx] || '').trim();
           if (key && !map[key]) map[key] = row;
         });
+        console.log(`[${shopId}] JOIN 맵 키 개수: ${Object.keys(map).length}`);
         joinDataMap[j.slotIndex] = {data: jData, keyIdx, map};
       }
     });
@@ -5025,14 +5091,21 @@ function executeSlotMerge(shopId, mainData, config, stId) {
       });
     }
 
-    /* 키워드 매칭용 텍스트 */
+    /* 키워드 매칭용 텍스트 (판매상품명 + 옵션명) */
     const prodNameCol = config.columns.find(c => c.name === '판매상품명');
     let prodNameText = '';
     if (prodNameCol && prodNameCol.source) {
       const pIdx = mainData.headers.indexOf(prodNameCol.source);
       if (pIdx >= 0) prodNameText = String(row[pIdx] || '');
     }
-    const matchResult = matchProductKeywordWithCode(prodNameText);
+    /* 옵션명도 키워드 매칭에 포함 (색상 구분 등) */
+    const optCol = config.columns.find(c => c.name === '옵션명');
+    let optText = '';
+    if (optCol && optCol.source) {
+      const optIdx = mainData.headers.indexOf(optCol.source);
+      if (optIdx >= 0) optText = String(row[optIdx] || '');
+    }
+    const matchResult = matchProductKeywordWithCode(prodNameText + ' ' + optText);
     const matchedProduct = matchResult.name;
     const matchedCode = matchResult.code;
 
@@ -5065,11 +5138,56 @@ function executeSlotMerge(shopId, mainData, config, stId) {
   return {headers: resultHeaders, rows: resultRows};
 }
 
+/* VAT 보정 함수: 매출금액(v+) 합계 ÷ 1.1 = 매출금액(v-) 합계가 되도록 가장 큰 금액 행에 차액 보정 */
+function adjustVatRounding(headers, rows) {
+  const vatPlusIdx = headers.indexOf('매출금액(v+)');
+  const vatMinusIdx = headers.indexOf('매출금액(v-)');
+  if (vatPlusIdx < 0 || vatMinusIdx < 0 || rows.length === 0) return rows;
+
+  /* 합계 계산 */
+  let totalVatPlus = 0;
+  let totalVatMinus = 0;
+  rows.forEach(row => {
+    totalVatPlus += Number(String(row[vatPlusIdx] || 0).replace(/,/g, '')) || 0;
+    totalVatMinus += Number(String(row[vatMinusIdx] || 0).replace(/,/g, '')) || 0;
+  });
+
+  /* 정확한 VAT 제외 금액 */
+  const correctVatMinus = Math.round(totalVatPlus / 1.1);
+  const diff = correctVatMinus - totalVatMinus;
+
+  if (diff === 0) return rows;
+
+  /* 가장 큰 매출금액(v+) 행 찾기 */
+  let maxIdx = 0;
+  let maxVal = 0;
+  rows.forEach((row, i) => {
+    const val = Math.abs(Number(String(row[vatPlusIdx] || 0).replace(/,/g, '')) || 0);
+    if (val > maxVal) {
+      maxVal = val;
+      maxIdx = i;
+    }
+  });
+
+  /* 차액 보정 */
+  const newRows = rows.map((row, i) => {
+    if (i === maxIdx) {
+      const newRow = [...row];
+      newRow[vatMinusIdx] = (Number(String(row[vatMinusIdx] || 0).replace(/,/g, '')) || 0) + diff;
+      return newRow;
+    }
+    return row;
+  });
+
+  return newRows;
+}
+
 /* 취합 실행 */
 function executeMerge(shopId, returnData, subTabId) {
   const stId = subTabId || undefined;
   const mergeId = stId || shopId;
   const config = getMappingConfig(shopId);
+  console.log(`[${shopId}] executeMerge 시작 - config.joins:`, config ? config.joins : 'config없음');
   if (!config) { if (!returnData) showToast('매핑 규칙이 없습니다'); return returnData ? null : undefined; }
 
   /* multiSlotMappings: 각 슬롯별로 개별 매핑 처리 후 결과 합치기 */
@@ -5194,6 +5312,9 @@ function executeMerge(shopId, returnData, subTabId) {
         allResultRows.push(couponRow);
       }
     }
+
+    /* VAT 반올림 오차 보정 */
+    allResultRows = adjustVatRounding(resultHeaders, allResultRows);
 
     if (returnData) return {headers: resultHeaders, rows: allResultRows};
     /* 엑셀 다운로드 */
@@ -5352,17 +5473,23 @@ function executeMerge(shopId, returnData, subTabId) {
 
   /* JOIN 데이터 Map 구성 */
   const joinMaps = [];
-  if (config.joins) {
-    config.joins.forEach(j => {
-      const jData = UPLOAD_FILES[getUploadKey(shopId, j.slotIndex, stId)];
+  if (config.joins && config.joins.length > 0) {
+    console.log(`[${shopId}] executeMerge JOIN 설정:`, config.joins);
+    config.joins.forEach((j, idx) => {
+      const uploadKey = getUploadKey(shopId, j.slotIndex, stId);
+      const jData = UPLOAD_FILES[uploadKey];
+      console.log(`[${shopId}] JOIN[${idx}] 슬롯${j.slotIndex} 키: ${uploadKey}, 데이터 있음: ${!!jData}`);
       if (!jData) { joinMaps.push(null); return; }
+      console.log(`[${shopId}] JOIN[${idx}] 헤더:`, jData.headers);
       const keyIdx = jData.headers.indexOf(j.targetKey);
+      console.log(`[${shopId}] JOIN[${idx}] targetKey '${j.targetKey}' 인덱스: ${keyIdx}`);
       if (keyIdx < 0) { joinMaps.push(null); return; }
       const map = {};
       jData.rows.forEach(row => {
         const k = String(row[keyIdx] || '').trim();
         if (k) map[k] = row;
       });
+      console.log(`[${shopId}] JOIN[${idx}] 맵 키 개수: ${Object.keys(map).length}`);
       joinMaps.push({map, headers: jData.headers, keyTransform: j.keyTransform});
     });
   }
@@ -5386,6 +5513,7 @@ function executeMerge(shopId, returnData, subTabId) {
     const srcIdx = mainData.headers.indexOf(j.keySource || config.columns.find(c => c.name === '주문번호')?.source);
     let orderKey = srcIdx >= 0 ? String(row[srcIdx] || '').trim() : '';
     if (jm.keyTransform === 'removePSuffix') orderKey = removePSuffix(orderKey);
+    if (jm.keyTransform === 'removeORPrefix') orderKey = orderKey.replace(/^OR/i, '');
     return jm.map[orderKey] || null;
   }
 
@@ -5437,6 +5565,9 @@ function executeMerge(shopId, returnData, subTabId) {
     const matchResult = matchProductKeywordWithCode(prodNameText + ' ' + optTextForMatch);
     const matchedProduct = matchResult.name;
     const matchedCode = matchResult.code;
+    if (matchedProduct === '미분류' && resultRows.length < 5) {
+      console.log(`[${shopId} 미분류] 상품명: '${prodNameText}', 옵션명: '${optTextForMatch}'`);
+    }
 
     /* JOIN에서 수량 가져오기 (qtyFromJoinOrZero용) */
     let joinQty = '';
@@ -5473,6 +5604,12 @@ function executeMerge(shopId, returnData, subTabId) {
         if (jRow && jData) {
           const hIdx = jData.headers.indexOf(col.joinSource.header);
           joinVal = hIdx >= 0 ? jRow[hIdx] : '';
+          if (shopId === 'pour_domegook' && col.name === '옵션명' && out.length < 3) {
+            console.log(`[도매꾹 옵션명] 헤더 '${col.joinSource.header}' 인덱스: ${hIdx}, jRow있음: ${!!jRow}, 값: '${joinVal}'`);
+            console.log(`[도매꾹 옵션명] jData.headers:`, jData.headers);
+          }
+        } else if (shopId === 'pour_domegook' && col.name === '옵션명' && out.length < 3) {
+          console.log(`[도매꾹 옵션명] jRow: ${!!jRow}, jData: ${!!jData}`);
         }
         /* transform 적용 (예: qtyByAmountSign) */
         if (col.transform) {
@@ -5507,9 +5644,12 @@ function executeMerge(shopId, returnData, subTabId) {
     resultRows.push(out);
   });
 
+  /* VAT 반올림 오차 보정 */
+  const adjustedRows = adjustVatRounding(resultHeaders, resultRows);
+
   /* 엑셀 다운로드 or 데이터 리턴 */
-  if (returnData) return {headers: resultHeaders, rows: resultRows};
-  const wsData = [resultHeaders, ...resultRows];
+  if (returnData) return {headers: resultHeaders, rows: adjustedRows};
+  const wsData = [resultHeaders, ...adjustedRows];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '쇼핑몰별_매출상세');
@@ -5686,31 +5826,31 @@ function downloadMaeibMaechulFormat() {
    */
   const LABEL_MAP = [
     /* 포어스토어 (code 404) */
-    {shopId:'pour_kg',           subTab:'',        brand:'포어스토어', label:'자사몰_kg이니시스',      code:404, bizName:'(주)케이지이니시스', bizNo:'2208155597'},
-    {shopId:'both_naver_pour',   subTab:'',        brand:'포어스토어', label:'자사몰_네이버페이',      code:404, bizName:'네이버파이낸셜 주식회사', bizNo:'5248601528'},
-    {shopId:'both_naver_gro',    subTab:'',        brand:'포어스토어', label:'자사몰_네이버페이',      code:404, bizName:'네이버파이낸셜 주식회사', bizNo:'5248601528'},
-    {shopId:'both_smart_pour',   subTab:'',        brand:'포어스토어', label:'스마트스토어',           code:404, bizName:'스마트스토어', bizNo:'5248601528'},
-    {shopId:'pour_coupang',      subTab:'jungae',  brand:'포어스토어', label:'쿠팡',                  code:404, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
-    {shopId:'pour_coupang',      subTab:'rocket',  brand:'포어스토어', label:'쿠팡_로켓그로스',        code:404, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
-    {shopId:'pour_gmarket',      subTab:'',        brand:'포어스토어', label:'지마켓',                code:404, bizName:'주식회사 지마켓', bizNo:'2208183676'},
-    {shopId:'pour_auction',      subTab:'',        brand:'포어스토어', label:'옥션',                  code:404, bizName:'주식회사 지마켓', bizNo:'2208183676'},
-    {shopId:'pour_11st',         subTab:'',        brand:'포어스토어', label:'11번가',                code:404, bizName:'십일번가 주식회사', bizNo:'8158101244'},
-    {shopId:'pour_bucket',       subTab:'',        brand:'포어스토어', label:'오늘의집',              code:404, bizName:'주식회사 버킷플레이스', bizNo:'1198691245'},
-    {shopId:'pour_domegook',     subTab:'',        brand:'포어스토어', label:'도매꾹',                code:404, bizName:'(주)지앤지커머스', bizNo:'1078628206'},
+    {shopId:'pour_kg',           subTab:'',        brand:'포어스토어', label:'포어스토어몰_kg이니시스',   code:404, bizName:'(주)케이지이니시스', bizNo:'2208155597'},
+    {shopId:'both_naver_pour',   subTab:'',        brand:'포어스토어', label:'포어스토어몰_네이버페이',   code:404, bizName:'네이버파이낸셜 주식회사', bizNo:'5248601528'},
+    {shopId:'both_naver_gro',    subTab:'',        brand:'포어스토어', label:'그로홈몰_네이버페이',       code:404, bizName:'네이버파이낸셜 주식회사', bizNo:'5248601528'},
+    {shopId:'both_smart_pour',   subTab:'',        brand:'포어스토어', label:'스마트스토어_포어스토어',   code:404, bizName:'스마트스토어', bizNo:'5248601528'},
+    {shopId:'pour_coupang',      subTab:'jungae',  brand:'포어스토어', label:'쿠팡',                    code:404, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
+    {shopId:'pour_coupang',      subTab:'rocket',  brand:'포어스토어', label:'쿠팡_로켓그로스',          code:404, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
+    {shopId:'pour_gmarket',      subTab:'',        brand:'포어스토어', label:'지마켓',                  code:404, bizName:'주식회사 지마켓', bizNo:'2208183676'},
+    {shopId:'pour_auction',      subTab:'',        brand:'포어스토어', label:'옥션',                    code:404, bizName:'주식회사 지마켓', bizNo:'2208183676'},
+    {shopId:'pour_11st',         subTab:'',        brand:'포어스토어', label:'11번가',                  code:404, bizName:'십일번가 주식회사', bizNo:'8158101244'},
+    {shopId:'pour_bucket',       subTab:'',        brand:'포어스토어', label:'오늘의집',                code:404, bizName:'주식회사 버킷플레이스', bizNo:'1198691245'},
+    {shopId:'pour_domegook',     subTab:'',        brand:'포어스토어', label:'도매꾹',                  code:404, bizName:'(주)지앤지커머스', bizNo:'1078628206'},
     /* 그로홈 (code 401) */
-    {shopId:'both_naver_gro',    subTab:'',        brand:'그로홈',    label:'그로홈몰_네이버페이',      code:401, bizName:'네이버파이낸셜 주식회사', bizNo:'5248601528'},
-    {shopId:'gro_cafe24',        subTab:'',        brand:'그로홈',    label:'그로홈몰_카페24',          code:401, bizName:'카페24 주식회사', bizNo:'1188120586'},
-    {shopId:'pour_coupang',      subTab:'jungae',  brand:'그로홈',    label:'쿠팡',                    code:401, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
-    {shopId:'pour_coupang',      subTab:'rocket',  brand:'그로홈',    label:'쿠팡_로켓그로스',          code:401, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
-    {shopId:'pour_domegook',     subTab:'',        brand:'그로홈',    label:'도매꾹',                  code:401, bizName:'(주)지앤지커머스', bizNo:'1078628206'},
-    {shopId:'both_smart_gro',    subTab:'',        brand:'그로홈',    label:'스마트스토어_그로홈',      code:401, bizName:'스마트스토어', bizNo:'5248601528'},
-    {shopId:'gro_kakao',         subTab:'',        brand:'그로홈',    label:'카카오톡 체크아웃',        code:401, bizName:'톡서랍플러스', bizNo:'1208147521'},
-    {shopId:'pour_bucket',       subTab:'',        brand:'그로홈',    label:'오늘의집',                code:401, bizName:'주식회사 버킷플레이스', bizNo:'1198691245'},
-    {shopId:'gro_kakaotalk',     subTab:'',        brand:'그로홈',    label:'카카오톡',                code:401, bizName:'톡서랍플러스', bizNo:'1208147521'},
-    {shopId:'pour_gmarket',      subTab:'',        brand:'그로홈',    label:'지마켓',                  code:401, bizName:'주식회사 지마켓', bizNo:'2208183676'},
+    {shopId:'both_naver_gro',    subTab:'',        brand:'그로홈',    label:'그로홈몰_네이버페이',        code:401, bizName:'네이버파이낸셜 주식회사', bizNo:'5248601528'},
+    {shopId:'gro_cafe24',        subTab:'',        brand:'그로홈',    label:'그로홈몰_카페24',            code:401, bizName:'카페24 주식회사', bizNo:'1188120586'},
+    {shopId:'pour_coupang',      subTab:'jungae',  brand:'그로홈',    label:'쿠팡',                      code:401, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
+    {shopId:'pour_coupang',      subTab:'rocket',  brand:'그로홈',    label:'쿠팡_로켓그로스',            code:401, bizName:'쿠팡 주식회사', bizNo:'1208800767'},
+    {shopId:'pour_domegook',     subTab:'',        brand:'그로홈',    label:'도매꾹',                    code:401, bizName:'(주)지앤지커머스', bizNo:'1078628206'},
+    {shopId:'both_smart_gro',    subTab:'',        brand:'그로홈',    label:'스마트스토어_그로홈',        code:401, bizName:'스마트스토어', bizNo:'5248601528'},
+    {shopId:'gro_kakao',         subTab:'',        brand:'그로홈',    label:'카카오 톡체크아웃',          code:401, bizName:'톡서랍플러스', bizNo:'1208147521'},
+    {shopId:'pour_bucket',       subTab:'',        brand:'그로홈',    label:'오늘의집',                  code:401, bizName:'주식회사 버킷플레이스', bizNo:'1198691245'},
+    {shopId:'gro_kakaotalk',     subTab:'',        brand:'그로홈',    label:'카카오 톡스토어',            code:401, bizName:'톡서랍플러스', bizNo:'1208147521'},
+    {shopId:'pour_gmarket',      subTab:'',        brand:'그로홈',    label:'지마켓',                    code:401, bizName:'주식회사 지마켓', bizNo:'2208183676'},
     /* 모여라딜 (code 401 그로홈 제품 / code 401 중개매출) */
-    {shopId:'moyeora_cafe24',     subTab:'',        brand:'그로홈',    label:'모여라딜_그로홈',        code:401, bizName:'카페24 주식회사', bizNo:'1188120586'},
-    {shopId:'moyeora_cafe24',     subTab:'',        brand:'모여라딜',  label:'모여라딜_중개',          code:401, bizName:'카페24 주식회사', bizNo:'1188120586'}
+    {shopId:'moyeora_cafe24',     subTab:'',        brand:'그로홈',    label:'모여라딜_그로홈',          code:401, bizName:'카페24 주식회사', bizNo:'1188120586'},
+    {shopId:'moyeora_cafe24',     subTab:'',        brand:'모여라딜',  label:'모여라딜_중개',            code:401, bizName:'카페24 주식회사', bizNo:'1188120586'}
   ];
 
   /* 각 쇼핑몰 데이터 취합하여 라벨별 집계 */
@@ -6008,6 +6148,7 @@ function renderDashboardContent(fmt) {
       shopKey = 'pour_coupang_1';
     }
 
+    /* v+ 금액을 먼저 합산하고 나중에 fmt 적용 (Raw 데이터로 집계) */
     result.rows.forEach(row => {
       const brand = String(row[brandIdx] || '').trim();
       const amt = Number(String(row[amtIdx] || 0).replace(/,/g, '')) || 0;
@@ -6020,28 +6161,26 @@ function renderDashboardContent(fmt) {
         if (m) month = parseInt(m[2]);
       }
 
-      const val = fmt(amt);
-
-      /* 브랜드별 집계 */
+      /* 브랜드별 집계 (Raw) */
       let brandKey = null;
       if (brand === '그로홈') brandKey = 'grohome';
       else if (brand === '포어스토어') brandKey = 'pourstore';
       else if (brand === '모여라딜') brandKey = 'moyeora';
 
       if (brandKey) {
-        brandTotals[brandKey] += val;
-        brandMonthTotals[brandKey][month - 1] += val;
+        brandTotals[brandKey] += amt;
+        brandMonthTotals[brandKey][month - 1] += amt;
       }
 
-      /* 쇼핑몰별 집계 (브랜드별로 분리) */
+      /* 쇼핑몰별 집계 (브랜드별로 분리, Raw) */
       const shopBrandKey = shopKey + '_' + (brandKey || 'other');
       if (!shopData[shopBrandKey]) {
         shopData[shopBrandKey] = { name: displayName, total: 0, monthVals: new Array(12).fill(0), brand: brandKey, shopKey: shopKey };
       }
-      shopData[shopBrandKey].total += val;
-      shopData[shopBrandKey].monthVals[month - 1] += val;
+      shopData[shopBrandKey].total += amt;
+      shopData[shopBrandKey].monthVals[month - 1] += amt;
 
-      /* 그로홈 제품별 집계 (제품코드 기준으로 그룹핑) */
+      /* 그로홈 제품별 집계 (제품코드 기준으로 그룹핑, Raw) */
       if (brandKey === 'grohome' && productData) {
         const productCodeIdx = result.headers.indexOf('제품코드');
         const productCode = productCodeIdx >= 0 ? String(row[productCodeIdx] || '').trim() : '';
@@ -6058,8 +6197,8 @@ function renderDashboardContent(fmt) {
           if (!productData[productKey]) {
             productData[productKey] = { name: displayProductName, code: productCode, total: 0, monthVals: new Array(12).fill(0) };
           }
-          productData[productKey].total += val;
-          productData[productKey].monthVals[month - 1] += val;
+          productData[productKey].total += amt;
+          productData[productKey].monthVals[month - 1] += amt;
 
           /* 제품별 그룹 집계 (색상 제외) - "_" 앞 부분만 추출 */
           if (productGroupData) {
@@ -6067,8 +6206,8 @@ function renderDashboardContent(fmt) {
             if (!productGroupData[groupName]) {
               productGroupData[groupName] = { name: groupName, total: 0, monthVals: new Array(12).fill(0) };
             }
-            productGroupData[groupName].total += val;
-            productGroupData[groupName].monthVals[month - 1] += val;
+            productGroupData[groupName].total += amt;
+            productGroupData[groupName].monthVals[month - 1] += amt;
           }
         }
       }
@@ -6078,7 +6217,7 @@ function renderDashboardContent(fmt) {
   /* 데이터 집계 실행 (로우데이터 기반 - 제품별 매출 등에 사용) */
   const { shopData } = aggregateDashboardData();
 
-  /* 로우데이터 집계가 비어있으면 DATA.sales 슬롯 기반으로 fallback */
+  /* 로우데이터 집계가 비어있으면 DATA.sales 슬롯 기반으로 fallback (Raw v+ 값으로 집계) */
   const hasRawData = (brandTotals.grohome + brandTotals.pourstore + brandTotals.moyeora) > 0;
   if (!hasRawData) {
     const grohomeSlots = ['gro_cafe24','both_naver_gro','gro_toss_pay','both_smart_gro','gro_kakao','gro_kakaotalk','gro_toss_shop','pour_bucket','pour_offline_grohome'];
@@ -6088,35 +6227,59 @@ function renderDashboardContent(fmt) {
       const sales = DATA.sales && DATA.sales[m];
       if (!sales) continue;
       grohomeSlots.forEach(sid => {
-        const v = fmt(Number(sales[sid]) || 0);
+        const v = Number(sales[sid]) || 0;
         brandTotals.grohome += v;
         brandMonthTotals.grohome[m - 1] += v;
       });
       pourstoreSlots.forEach(sid => {
-        const v = fmt(Number(sales[sid]) || 0);
+        const v = Number(sales[sid]) || 0;
         brandTotals.pourstore += v;
         brandMonthTotals.pourstore[m - 1] += v;
       });
       /* 모여라딜 (moyeora_cafe24 fallback 처리) */
       let moySum = 0;
-      const mGro = fmt(Number(sales['moyeora_grohome']) || 0);
-      let mJg = fmt(Number(sales['moyeora_moyeora']) || 0);
+      const mGro = Number(sales['moyeora_grohome']) || 0;
+      let mJg = Number(sales['moyeora_moyeora']) || 0;
       if (mJg === 0) {
         const legacy = Number(sales['moyeora_cafe24']) || 0;
         const groVal = Number(sales['moyeora_grohome']) || 0;
-        if (legacy > 0 && groVal === 0) mJg = fmt(legacy);
-        else if (legacy > 0) mJg = fmt(legacy - groVal);
+        if (legacy > 0 && groVal === 0) mJg = legacy;
+        else if (legacy > 0) mJg = legacy - groVal;
       }
-      const mOffGro = fmt(Number(sales['pour_offline_moyeora_grohome']) || 0);
-      let mOffJg = fmt(Number(sales['pour_offline_moyeora_jungae']) || 0);
+      const mOffGro = Number(sales['pour_offline_moyeora_grohome']) || 0;
+      let mOffJg = Number(sales['pour_offline_moyeora_jungae']) || 0;
       if (mOffJg === 0 && mOffGro === 0) {
-        mOffJg = fmt(Number(sales['pour_offline_moyeora']) || 0);
+        mOffJg = Number(sales['pour_offline_moyeora']) || 0;
       }
       moySum = mGro + mJg + mOffGro + mOffJg;
       brandTotals.moyeora += moySum;
       brandMonthTotals.moyeora[m - 1] += moySum;
     }
   }
+
+  /* 모든 집계가 끝난 후 fmt 적용 (합계에서 ÷1.1) */
+  brandTotals.grohome = fmt(brandTotals.grohome);
+  brandTotals.pourstore = fmt(brandTotals.pourstore);
+  brandTotals.moyeora = fmt(brandTotals.moyeora);
+  for (let i = 0; i < 12; i++) {
+    brandMonthTotals.grohome[i] = fmt(brandMonthTotals.grohome[i]);
+    brandMonthTotals.pourstore[i] = fmt(brandMonthTotals.pourstore[i]);
+    brandMonthTotals.moyeora[i] = fmt(brandMonthTotals.moyeora[i]);
+  }
+  /* shopData도 fmt 적용 */
+  Object.values(shopData).forEach(shop => {
+    shop.total = fmt(shop.total);
+    shop.monthVals = shop.monthVals.map(v => fmt(v));
+  });
+  /* productSalesData, productGroupSalesData도 fmt 적용 */
+  Object.values(productSalesData).forEach(p => {
+    p.total = fmt(p.total);
+    p.monthVals = p.monthVals.map(v => fmt(v));
+  });
+  Object.values(productGroupSalesData).forEach(p => {
+    p.total = fmt(p.total);
+    p.monthVals = p.monthVals.map(v => fmt(v));
+  });
 
   /* 브랜드별 쇼핑몰 필터링 함수 */
   function filterShopsByBrand(data, targetBrand) {
